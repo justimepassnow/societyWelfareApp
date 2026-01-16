@@ -10,7 +10,18 @@ import time
 from core import db
 
 def admin_dashboard():
-    st.header(f"Admin Dashboard | Welcome, {st.session_state['username']}")
+    st.markdown(
+        f"""
+        <div class="hero-card">
+            <span class="info-pill">Admin Control Center</span>
+            <span class="info-pill">Live Fund Insights</span>
+            <h1>Welcome back, {st.session_state['username']}</h1>
+            <p>Monitor collections, manage members, and keep every fund on track.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.header("Admin Dashboard")
 
     all_logs_df = db.get_all_payment_logs()
 

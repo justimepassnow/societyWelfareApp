@@ -1,3 +1,6 @@
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 import streamlit as st
 import pandas as pd
 from datetime import datetime
@@ -7,7 +10,18 @@ import time
 from core import db
 
 def admin_dashboard():
-    st.header(f"Admin Dashboard | Welcome, {st.session_state['username']}")
+    st.markdown(
+        f"""
+        <div class="hero-card">
+            <span class="info-pill">Admin Control Center</span>
+            <span class="info-pill">Live Fund Insights</span>
+            <h1>Welcome back, {st.session_state['username']}</h1>
+            <p>Monitor collections, manage members, and keep every fund on track.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.header("Admin Dashboard")
 
     all_logs_df = db.get_all_payment_logs()
 
@@ -190,8 +204,22 @@ def admin_dashboard():
 
     # --- NOTIFICATIONS TAB ---
     with tab3:
-        st.subheader("Send Payment Reminders via WhatsApp")
-        st.warning("This will attempt to open the WhatsApp desktop app for **each** reminder. Please ensure you are logged into WhatsApp.")
+        st.subheader("Email Reminder Configuration")
+        with st.expander("Configure SMTP Server"):
+            with st.form("smtp_config_form"):
+                smtp_server = st.text_input("SMTP Server", value=db.get_setting("smtp_server") or "")
+                smtp_port = st.number_input("SMTP Port", value=int(db.get_setting("smtp_port") or 587))
+                smtp_user = st.text_input("SMTP Username", value=db.get_setting("smtp_user") or "")
+                smtp_password = st.text_input("SMTP Password", type="password", value=db.get_setting("smtp_password") or "")
+                if st.form_submit_button("Save SMTP Configuration"):
+                    db.set_setting("smtp_server", smtp_server)
+                    db.set_setting("smtp_port", str(smtp_port))
+                    db.set_setting("smtp_user", smtp_user)
+                    db.set_setting("smtp_password", smtp_password)
+                    st.success("SMTP configuration saved!")
+                    
+        st.subheader("Send Payment Reminders")
+        st.warning("This will attempt to open the WhatsApp desktop app for **each** reminder and send emails if configured. Please ensure you are logged into WhatsApp.")
         
         fund_options_reminders = db.get_fund_options()
         fund_list_reminders = {row.ListName: row.List_ID for row in fund_options_reminders.itertuples(index=False)}
@@ -210,14 +238,34 @@ def admin_dashboard():
             st.info("No members with unpaid dues for the selected fund.")
 
         if st.button("Send Reminders"):
+            smtp_server_val = db.get_setting("smtp_server")
+            smtp_port_val = db.get_setting("smtp_port")
+            smtp_user_val = db.get_setting("smtp_user")
+            smtp_password_val = db.get_setting("smtp_password")
+
             reminders_to_send = db.get_reminders_to_send(selected_list_id_reminder or None)
 
             if not reminders_to_send:
                 st.info("No reminders due to be sent for the selected criteria.")
             else:
-                st.info(f"Preparing to open WhatsApp for {len(reminders_to_send)} reminders...")
+                st.info(f"Preparing to send {len(reminders_to_send)} reminders...")
+
+                whatsapp_reminders = 0
+                email_reminders = 0
+
+                # Set up SMTP connection if configured
+                server = None
+                if smtp_server_val and smtp_port_val and smtp_user_val and smtp_password_val:
+                    try:
+                        server = smtplib.SMTP(smtp_server_val, int(smtp_port_val))
+                        server.starttls()
+                        server.login(smtp_user_val, smtp_password_val)
+                        st.write("✅ SMTP server connected.")
+                    except Exception as e:
+                        st.error(f"Could not connect to SMTP server: {e}")
                 
                 for reminder in reminders_to_send:
+                    # --- WhatsApp Reminder ---
                     message = f"Hi {reminder['Username']}, this is a friendly reminder that your contribution of ₹{reminder['Amount']} for '{reminder['ListName']}' is due. Please pay via the portal. Thank you!"
                     encoded_message = quote(message)
                     whatsapp_url = f"whatsapp://send?phone={reminder['PhoneNumber']}&text={encoded_message}"
@@ -228,13 +276,33 @@ def admin_dashboard():
                             time.sleep(10)
                         
                         db.log_notification(reminder['User_ID'], reminder['List_ID'])
-                        st.write(f"✅ Reminder for {reminder['Username']} prepared. Please press 'Send' in WhatsApp.")
+                        st.write(f"✅ WhatsApp reminder for {reminder['Username']} prepared.")
+                        whatsapp_reminders += 1
 
                     except Exception as e:
                         st.error(f"Could not open WhatsApp for {reminder['Username']}: {e}")
-                
-                st.success("All reminder tabs have been prepared!")
 
+                    # --- Email Reminder ---
+                    if reminder['Email'] and server:
+                        try:
+                            msg = MIMEMultipart()
+                            msg['From'] = smtp_user_val
+                            msg['To'] = reminder['Email']
+                            msg['Subject'] = f"Payment Reminder: {reminder['ListName']}"
+                            
+                            body = f"Dear {reminder['Username']},\n\nThis is a friendly reminder that your contribution of ₹{reminder['Amount']} for '{reminder['ListName']}' is due.\n\nPlease make the payment at your earliest convenience.\n\nThank you,\nSociety Welfare Committee"
+                            msg.attach(MIMEText(body, 'plain'))
+                            
+                            server.send_message(msg)
+                            st.write(f"✅ Email reminder sent to {reminder['Username']} at {reminder['Email']}.")
+                            email_reminders += 1
+                        except Exception as e:
+                            st.error(f"Could not send email to {reminder['Username']}: {e}")
+
+                if server:
+                    server.quit()
+
+                st.success(f"All reminders processed! Sent {whatsapp_reminders} WhatsApp reminders and {email_reminders} email reminders.")
     # --- BULK VERIFICATION TAB ---
     with tab4:
         st.subheader("Transaction ID Bulk Verification")

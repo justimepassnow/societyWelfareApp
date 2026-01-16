@@ -30,6 +30,10 @@ def setup_database():
         c.execute("ALTER TABLE Payment_Logs ADD COLUMN Transaction_ID TEXT;")
     except sqlite3.OperationalError:
         pass # Column already exists
+    try:
+        c.execute("ALTER TABLE Users ADD COLUMN Email TEXT;")
+    except sqlite3.OperationalError:
+        pass # Column already exists
 
     # User Table
     c.execute('''
@@ -38,7 +42,8 @@ def setup_database():
             Username TEXT NOT NULL,
             PasswordHash TEXT NOT NULL,
             Role TEXT NOT NULL CHECK(Role IN ('Admin', 'Member')),
-            PhoneNumber TEXT UNIQUE NOT NULL
+            PhoneNumber TEXT UNIQUE NOT NULL,
+            Email TEXT
         )
     ''')
 
@@ -125,8 +130,8 @@ def setup_database():
     c.execute("SELECT * FROM Users WHERE Username = 'admin'")
     if not c.fetchone():
         hashed_password = hashlib.sha256('admin123'.encode()).hexdigest()
-        c.execute("INSERT INTO Users (Username, PasswordHash, Role, PhoneNumber) VALUES (?, ?, ?, ?)",
-                  ('admin', hashed_password, 'Admin', '+11234567890')) # Placeholder number
+        c.execute("INSERT INTO Users (Username, PasswordHash, Role, PhoneNumber, Email) VALUES (?, ?, ?, ?, ?)",
+                  ('admin', hashed_password, 'Admin', '+11234567890', 'admin@example.com')) # Placeholder email
 
 
 
@@ -196,8 +201,8 @@ def get_member_users():
     """Fetches all users with the 'Member' role."""
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT User_ID, Username, PhoneNumber FROM Users WHERE Role = 'Member'")
-    members = {row['PhoneNumber']: {'User_ID': row['User_ID'], 'Username': row['Username']} for row in c.fetchall()}
+    c.execute("SELECT User_ID, Username, PhoneNumber, Email FROM Users WHERE Role = 'Member'")
+    members = {row['PhoneNumber']: {'User_ID': row['User_ID'], 'Username': row['Username'], 'Email': row['Email']} for row in c.fetchall()}
     conn.close()
     return members
     
@@ -274,7 +279,7 @@ def get_reminders_to_send(list_id=None):
     """Fetches the full details of reminders to be sent."""
     conn = get_db_connection()
     base_query = """
-        SELECT pl.User_ID, pl.List_ID, u.Username, u.PhoneNumber, fl.ListName, pl.Amount
+        SELECT pl.User_ID, pl.List_ID, u.Username, u.PhoneNumber, u.Email, fl.ListName, pl.Amount
         FROM Payment_Logs pl
         JOIN Users u ON pl.User_ID = u.User_ID
         JOIN Fund_Lists fl ON pl.List_ID = fl.List_ID
@@ -325,12 +330,12 @@ def verify_transactions(unverified_df, bank_df, txn_id_col, amount_col):
     try:
         # --- Data Cleaning ---
         # Handle potential whitespace, quotes, and ensure consistent data types
-        bank_df[txn_id_col] = bank_df[txn_id_col].astype(str).str.strip().str.strip('"\'')
+        bank_df[txn_id_col] = bank_df[txn_id_col].astype(str).str.strip().str.strip("'\"")
         # Additional step to handle potential '.0' suffix for purely numeric IDs
         bank_df[txn_id_col] = bank_df[txn_id_col].apply(lambda x: x.split('.')[0] if isinstance(x, str) and '.' in x and x.replace('.', '').isdigit() else x)
 
         # Coerce errors will turn non-numeric values into NaN, which are then dropped.
-        bank_df[amount_col] = pd.to_numeric(bank_df[amount_col].astype(str).str.strip().str.strip('"\''), errors='coerce')
+        bank_df[amount_col] = pd.to_numeric(bank_df[amount_col].astype(str).str.strip().str.strip("'\""), errors='coerce')
         bank_df.dropna(subset=[amount_col], inplace=True)
         
         bank_df_indexed = bank_df.set_index(txn_id_col)

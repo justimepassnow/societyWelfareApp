@@ -17,13 +17,13 @@ def check_login(phone_number, password):
         return user
     return None
 
-def create_user(username, password, role, phone_number):
+def create_user(username, password, role, phone_number, email=None):
     """Creates a new user in the database."""
     conn = get_db_connection()
     c = conn.cursor()
     try:
-        c.execute("INSERT INTO Users (Username, PasswordHash, Role, PhoneNumber) VALUES (?, ?, ?, ?)",
-                  (username, hash_password(password), role, phone_number))
+        c.execute("INSERT INTO Users (Username, PasswordHash, Role, PhoneNumber, Email) VALUES (?, ?, ?, ?, ?)",
+                  (username, hash_password(password), role, phone_number, email))
         conn.commit()
         return True, None
     except sqlite3.IntegrityError:

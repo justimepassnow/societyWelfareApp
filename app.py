@@ -3,57 +3,31 @@ import time
 from core import auth, db
 from core.admin_dashboard import admin_dashboard
 from core.member_dashboard import member_dashboard
-from streamlit_lottie import st_lottie
-import json
-import requests
-
-def load_lottieurl(url: str):
-    r = requests.get(url)
-    if r.status_code != 200:
-        return None
-    return r.json()
-
-def load_css(file_name):
-    with open(file_name) as f:
-        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 
 def login_page():
     st.title("Society Welfare Fund Management System")
+    st.header("Login")
 
-    col1, col2 = st.columns([1, 1])
+    with st.form("login_form"):
+        phone_number = st.text_input("Phone Number").lower()
+        password = st.text_input("Password", type="password")
+        login_button = st.form_submit_button("Login")
 
-    with col1:
-        st.header("Login")
-        with st.form("login_form"):
-            phone_number = st.text_input("Phone Number").lower()
-            password = st.text_input("Password", type="password")
-            login_button = st.form_submit_button("Login")
+        if login_button:
+            user = auth.check_login(phone_number, password)
+            if user:
+                st.session_state['logged_in'] = True
+                st.session_state['user_id'] = user['User_ID']
+                st.session_state['username'] = user['Username']
+                st.session_state['role'] = user['Role']
+                st.session_state['page'] = 'dashboard'
+                st.rerun()
+            else:
+                st.error("Invalid phone number or password.")
 
-            if login_button:
-                user = auth.check_login(phone_number, password)
-                if user:
-                    st.toast(f"Welcome {user['Username']}!", icon="🎉")
-                    st.session_state['logged_in'] = True
-                    st.session_state['user_id'] = user['User_ID']
-                    st.session_state['username'] = user['Username']
-                    st.session_state['role'] = user['Role']
-                    st.session_state['page'] = 'dashboard'
-                    time.sleep(2)
-                    st.rerun()
-                else:
-                    st.error("Invalid phone number or password.")
-
-        if st.button("Create new account"):
-            st.session_state['page'] = 'register'
-            st.rerun()
-
-    with col2:
-        lottie_login = load_lottieurl("https://assets5.lottiefiles.com/packages/lf20_jcikwtux.json")
-        if lottie_login:
-            st_lottie(lottie_login, height=300)
-        else:
-            st.write("Lottie animation failed to load.")
-
+    if st.button("Create new account"):
+        st.session_state['page'] = 'register'
+        st.rerun()
 
 def registration_page():
     st.title("Create Account")
@@ -86,7 +60,6 @@ def registration_page():
 def main():
     """Main function to run the Streamlit app."""
     st.set_page_config(page_title="Welfare Fund Management", layout="wide")
-    load_css('style.css')
     
     db.setup_database()
 

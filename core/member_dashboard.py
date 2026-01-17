@@ -6,36 +6,11 @@ import time
 from core import db
 from config import SOCIETY_VPA, SOCIETY_NAME
 
-def create_dashboard_card(icon, title, value, description):
-    st.markdown(
-        f"""
-        <div class="dashboard-card">
-            <img src="{icon}" alt="{title} icon">
-            <h3>{title}</h3>
-            <p style="font-size: 2rem; font-weight: bold;">{value}</p>
-            <p>{description}</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
 def member_dashboard():
     st.header(f"Member Dashboard | Welcome, {st.session_state['username']}")
     user_id = st.session_state['user_id']
     
     dues_df = db.get_member_dues(user_id)
-    history_df = db.get_payment_history(user_id)
-
-    total_dues = dues_df['Amount'].sum()
-    total_paid = history_df[history_df['Status'] == 'Paid']['Amount'].sum()
-
-    col1, col2 = st.columns(2)
-    with col1:
-        create_dashboard_card("https://img.icons8.com/plasticine/100/000000/request-money.png", "Outstanding Dues", f"₹{total_dues:,.2f}", "Total amount due")
-    with col2:
-        create_dashboard_card("https://img.icons8.com/plasticine/100/000000/initiate-money-transfer.png", "Total Paid", f"₹{total_paid:,.2f}", "Total amount paid")
-
-    st.divider()
 
     tab1, tab2 = st.tabs(["💰 My Payments", "📜 Payment History"])
 

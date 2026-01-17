@@ -9,25 +9,12 @@ from urllib.parse import quote
 import time
 from core import db
 
-def create_dashboard_card(icon, title, value, description):
-    st.markdown(
-        f"""
-        <div class="dashboard-card">
-            <img src="{icon}" alt="{title} icon">
-            <h3>{title}</h3>
-            <p style="font-size: 2rem; font-weight: bold;">{value}</p>
-            <p>{description}</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
 def admin_dashboard():
     st.header(f"Admin Dashboard | Welcome, {st.session_state['username']}")
 
     all_logs_df = db.get_all_payment_logs()
 
-    tab1, tab2, tab3, tab4 = st.tabs(["📊 Dashboard", "👥 Management", "🔔 Notifications", "🏦 Bulk Verification"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📊 Financials", "👥 Management", "🔔 Notifications", "🏦 Bulk Verification"])
 
     # --- FINANCIAL DASHBOARD ---
     with tab1:
@@ -44,12 +31,9 @@ def admin_dashboard():
             total_delinquency = all_logs_df[all_logs_df['Status'].isin(['Unpaid', 'Pending Verification', 'Rejected'])]['Amount'].sum()
 
             col1, col2, col3 = st.columns(3)
-            with col1:
-                create_dashboard_card("https://img.icons8.com/plasticine/100/000000/money-bag.png", "Collection Rate", f"{collection_rate:.2f}%", "of total dues collected")
-            with col2:
-                create_dashboard_card("https://img.icons8.com/plasticine/100/000000/initiate-money-transfer.png", "Total Collected", f"₹{total_collected:,.2f}", "in total revenue")
-            with col3:
-                create_dashboard_card("https://img.icons8.com/plasticine/100/000000/request-money.png", "Outstanding Dues", f"₹{total_delinquency:,.2f}", "in outstanding payments")
+            col1.metric("Collection Rate", f"{collection_rate:.2f}%")
+            col2.metric("Total Collected", f"₹{total_collected:,.2f}")
+            col3.metric("Total Outstanding Dues", f"₹{total_delinquency:,.2f}", delta_color="inverse")
 
             st.divider()
             st.subheader("Collection Trends")

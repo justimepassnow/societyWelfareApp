@@ -7,18 +7,7 @@ from core import db
 from config import SOCIETY_VPA, SOCIETY_NAME
 
 def member_dashboard():
-    st.markdown(
-        f"""
-        <div class="hero-card">
-            <span class="info-pill">Member Portal</span>
-            <span class="info-pill">Fast Payments</span>
-            <h1>Hello, {st.session_state['username']}</h1>
-            <p>View your dues, submit payments, and keep a clean contribution history.</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    st.header("Member Dashboard")
+    st.header(f"Member Dashboard | Welcome, {st.session_state['username']}")
     user_id = st.session_state['user_id']
     
     dues_df = db.get_member_dues(user_id)
